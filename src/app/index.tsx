@@ -1,98 +1,208 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import * as Notifications from 'expo-notifications';
+import { useEffect, useState } from 'react';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
+import {
+  Alert,
+  Button,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+
+export default function ReminderTab() {
+
+  const [isReminding, setIsReminding] = useState(false);
+
+  const [message, setMessage] = useState(
+    'Time to drink a glass of water!'
+  );
+
+  const [intervalMinutes, setIntervalMinutes] = useState('1');
+
+  
+  useEffect(() => {
+    async function requestPermissions() {
+
+      const { status } =
+        await Notifications.requestPermissionsAsync();
+
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'We need notification permission to remind you to drink water!'
+        );
+      }
+    }
+
+    requestPermissions();
+  }, []);
+
+  
+  async function scheduleReminder() {
+
+    const minutes = Number(intervalMinutes);
+
+    if (!Number.isInteger(minutes) || minutes < 1) {
+      Alert.alert('Invalid Interval', 'Enter a valid interval.');
+      return;
+    }
+
+    if (!message.trim()) {
+      Alert.alert('Empty Message', 'Enter a reminder message.');
+      return;
+    }
+
+    
+    const { status } =
+      await Notifications.requestPermissionsAsync();
+
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Denied',
+        'Please allow notifications in phone settings.'
+      );
+      return;
+    }
+
+    
+    await Notifications.cancelAllScheduledNotificationsAsync();
+
+    
+    await Notifications.scheduleNotificationAsync({
+
+      content: {
+        title: '💧 Hydration Alert!',
+        body: message,
+        sound: true,
+      },
+
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: minutes * 60,
+        repeats: true,
+      },
+
+    });
+
+    setIsReminding(true);
+
+    Alert.alert(
+      'Set!',
+      `Reminding you every ${minutes} minutes.`
     );
   }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+
+  
+  async function stopReminder() {
+
+    await Notifications.cancelAllScheduledNotificationsAsync();
+
+    setIsReminding(false);
+
+    Alert.alert(
+      'Stopped',
+      'Reminders cancelled.'
+    );
+  }
+
+  
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+    <View style={styles.container}>
 
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+      <Text style={styles.emoji}>🥤</Text>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+      <Text style={styles.label}>
+        Add a Custom Message
+      </Text>
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+      <TextInput
+        style={styles.input}
+        value={message}
+        onChangeText={setMessage}
+        placeholder="Enter reminder message"
+      />
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+      <Text style={styles.label}>
+        Set Interval (minutes)
+      </Text>
+
+      <TextInput
+        style={styles.input}
+        value={intervalMinutes}
+        onChangeText={setIntervalMinutes}
+        keyboardType="numeric"
+        placeholder="Enter minutes"
+      />
+
+      <Text style={styles.status}>
+        Status: {isReminding ? 'Active 🟢' : 'Inactive 🔴'}
+      </Text>
+
+      <View style={styles.button}>
+        <Button
+          title="START REMINDERS"
+          onPress={scheduleReminder}
+          color="#0EA5E9"
+        />
+      </View>
+
+      <View style={{ height: 10 }} />
+
+      <View style={styles.button}>
+        <Button
+          title="STOP REMINDERS"
+          onPress={stopReminder}
+          color="#EF4444"
+        />
+      </View>
+
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+
   container: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
+    backgroundColor: '#E0F7FA',
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    padding: 20,
   },
-  title: {
-    textAlign: 'center',
+
+  emoji: {
+    fontSize: 65,
+    marginBottom: 30,
   },
-  code: {
-    textTransform: 'uppercase',
+
+  label: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+
+  input: {
+    width: '90%',
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#B0BEC5',
   },
+
+  status: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginVertical: 20,
+  },
+
+  button: {
+    width: '80%',
+  },
+
 });
+
